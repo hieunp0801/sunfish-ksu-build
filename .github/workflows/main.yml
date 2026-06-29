@@ -1,0 +1,51 @@
+name: Build sunfish KSU kernel
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
+          df -h
+
+      - name: Install deps
+        run: |
+          sudo apt update
+          sudo apt install -y git repo bc bison flex libssl-dev libelf-dev \
+            build-essential python3 python-is-python3 lz4 cpio kmod zip unzip rsync ca-certificates curl
+
+      - name: Sync kernel source
+        run: |
+          mkdir kernel && cd kernel
+          repo init -u https://android.googlesource.com/kernel/manifest -b android-msm-sunfish-4.14-android13-qpr3 --depth=1
+          repo sync -j$(nproc) -c --no-tags
+
+      - name: Integrate SukiSU-Ultra (susfs-main)
+        run: |
+          cd kernel/private/msm-google
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+          CFG=arch/arm64/configs/sunfish_defconfig
+          sed -i 's/^CONFIG_KPROBES=y/# CONFIG_KPROBES is not set/' "$CFG" || true
+          cat >> "$CFG" <<'EOF'
+          CONFIG_KSU=y
+          CONFIG_KSU_MANUAL_HOOK=y
+          CONFIG_KPM=y
+          CONFIG_KALLSYMS=y
+          CONFIG_KALLSYMS_ALL=y
+          EOF
+          echo 'POST_DEFCONFIG_CMDS=""' >> build.config.sunfish
+
+      - name: Build
+        run: |
+          cd kernel
+          LTO=none BUILD_CONFIG=private/msm-google/build.config.sunfish build/build.sh
+
+      - name: Upload kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-out
+          path: |
+            kernel/out/android-msm-pixel-4.14/dist/Image.lz4-dtb
+            kernel/out/android-msm-pixel-4.14/dist/dtbo.img

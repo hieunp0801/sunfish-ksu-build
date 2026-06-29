@@ -21,6 +21,14 @@ jobs:
             build-essential python3 python-is-python3 lz4 cpio kmod zip unzip \
             rsync ca-certificates curl
 
+      - name: Add swap
+        run: |
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
       - name: Build kernel
         run: |
           chmod +x build.sh

@@ -30,10 +30,17 @@ CFG=arch/arm64/configs/sunfish_defconfig
 # tắt kprobe (non-GKI dùng manual hook)
 sed -i 's/^CONFIG_KPROBES=y/# CONFIG_KPROBES is not set/' "$CFG" || true
 
-# tắt CFI + Shadow Call Stack phòng hờ (sunfish 4.14 thường vốn đã off)
+# tắt CFI + Shadow Call Stack phòng hờ
 sed -i 's/^CONFIG_CFI_CLANG=y/# CONFIG_CFI_CLANG is not set/' "$CFG" || true
 sed -i 's/^CONFIG_SHADOW_CALL_STACK=y/# CONFIG_SHADOW_CALL_STACK is not set/' "$CFG" || true
 
+# tắt LTO trong defconfig (nếu không, link vmlinux sẽ OOM trên runner)
+sed -i '/^CONFIG_LTO_CLANG=y/d' "$CFG" || true
+sed -i '/^CONFIG_THINLTO=y/d' "$CFG" || true
+sed -i '/^CONFIG_LTO_CLANG_THIN=y/d' "$CFG" || true
+echo "CONFIG_LTO_NONE=y" >> "$CFG"
+
+# config KSU + SukiSU
 cat >> "$CFG" <<'EOF'
 CONFIG_KSU=y
 CONFIG_KSU_MANUAL_HOOK=y
